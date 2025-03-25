@@ -1,6 +1,6 @@
 # packet-replay
 
-This repository contains a library and a set of executables designed to recreate network requests saved in a PCAP capture file.
+This repository contains a library and a set of executables designed to recreate network requests saved in a PCAP (Wireshark, tcpdump) capture file.
 
 ## Motivations
 
