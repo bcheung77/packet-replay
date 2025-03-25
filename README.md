@@ -34,10 +34,10 @@ Usage: http_replay [-c <client spec>] <cap file>
 
 client spec - \<src IP\>[:\<src port\>[:\<test IP\>[:\<test port\>]]]
 
-src IP - the IP address of the client in the capture file to recreate
-src port - the port of the client in the capture file to recreate
-test IP - the IP of the target server to send the recreated requests to.  Defaults to the IP in the capture file
-test port - the port of the target server to send the recreated request to.  Defaults to the port in the capture file
+- src IP - the IP address of the client in the capture file to recreate
+- src port - the port of the client in the capture file to recreate
+- test IP - the IP of the target server to send the recreated requests to.  Defaults to the IP in the capture file
+- test port - the port of the target server to send the recreated request to.  Defaults to the port in the capture file
 
 If no "client spec" is specified, the TCP stream with the first connection request is recreated.
 
