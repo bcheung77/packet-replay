@@ -33,7 +33,7 @@ namespace packet_replay {
                 }
 
                 ~action() {
-                    delete data_;
+                    delete[] data_;
                 }
             } Action;
 

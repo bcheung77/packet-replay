@@ -27,10 +27,10 @@ namespace packet_replay {
                     action_queue_.pop();
                 }
 
-                delete cap_src_addr_;
-                delete cap_dest_addr_;
-                delete test_dest_addr_;
-                delete test_sock_addr_;
+                delete[] cap_src_addr_;
+                delete[] cap_dest_addr_;
+                delete[] test_dest_addr_;
+                delete[] test_sock_addr_;
             }
 
             /**

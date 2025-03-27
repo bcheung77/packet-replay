@@ -26,7 +26,7 @@ namespace packet_replay {
             }
 
             ~HttpResponseProcessor() {
-                delete payload_;
+                delete[] payload_;
             }
 
             /**
