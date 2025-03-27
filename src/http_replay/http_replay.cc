@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
             switch(opt)  
             {  
                 case 'c':  
-                    store.addConfiguredConversation(optarg);
+                    store.addTargetTestServer(optarg);
                     break;  
 
                 default:

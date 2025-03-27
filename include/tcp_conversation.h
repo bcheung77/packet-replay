@@ -5,7 +5,7 @@
 #include <string.h>
 #include <netinet/in.h>
 
-#include "configured_conversation.h"
+#include "target_test_server.h"
 #include "packet_conversation.h"
 
 namespace packet_replay {
@@ -19,7 +19,7 @@ namespace packet_replay {
 
             TcpConversation() = delete;
 
-            TcpConversation(const TransportPacket& packet, const ConfiguredConversation* configured_conversation);
+            TcpConversation(const TransportPacket& packet, const TargetTestServer* configured_conversation);
 
             virtual ~TcpConversation() {
                 while (!action_queue_.empty()) {
@@ -31,25 +31,6 @@ namespace packet_replay {
                 delete[] cap_dest_addr_;
                 delete[] test_dest_addr_;
                 delete[] test_sock_addr_;
-            }
-
-            /**
-             * The current action.
-             */
-            Action* actionFront() {
-                return action_queue_.front();
-            }
-
-            bool actionEmpty() {
-                return action_queue_.empty();
-            }
-
-            /**
-             * remove the current action
-             */
-            void actionPop() {
-                delete action_queue_.front();
-                action_queue_.pop();
             }
 
             void processCapturePacket(const TransportPacket& packet);

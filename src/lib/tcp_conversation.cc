@@ -6,7 +6,7 @@
 #include "tcp_conversation.h"
 
 namespace packet_replay {
-    TcpConversation::TcpConversation(const TransportPacket& packet, const ConfiguredConversation* configured_conversation) : 
+    TcpConversation::TcpConversation(const TransportPacket& packet, const TargetTestServer* configured_conversation) : 
         capTcpState_(CLOSED), socket_(-1) {
             Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
             TcpLayer* tcpLayer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));

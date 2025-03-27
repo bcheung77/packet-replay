@@ -19,7 +19,7 @@ namespace packet_replay {
         return addr1 + KEY_SEPARATOR + std::to_string(port1) + KEY_SEPARATOR + addr2 + KEY_SEPARATOR + std::to_string(port2);
     }
     
-    std::pair<std::string, ConfiguredConversation*> TcpConversationFactory::createConfiguredConversation(const char* spec) {
+    std::pair<std::string, TargetTestServer*> TcpConversationFactory::createTargetTestServer(const char* spec) {
         std::string src_addr;
         int src_port = NO_PORT;
         bool has_test_addr = false;
@@ -67,12 +67,12 @@ namespace packet_replay {
         }
 
         std::string key = src_port != NO_PORT ? src_addr + ":" + std::to_string(src_port) : src_addr;
-        ConfiguredConversation* value =  test_addr.empty() ? nullptr : new ConfiguredConversation(test_addr, test_port);
+        TargetTestServer* value =  test_addr.empty() ? nullptr : new TargetTestServer(test_addr, test_port);
 
         return {key, value};
     }
 
-    std::vector<std::string> TcpConversationFactory::getConfiguredConversationKeys(const TransportPacket& packet) {
+    std::vector<std::string> TcpConversationFactory::getTargetTestServerKeys(const TransportPacket& packet) {
         Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
         TcpLayer* tcpLayer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
@@ -111,7 +111,7 @@ namespace packet_replay {
         }
     }
 
-    TcpConversation* TcpConversationFactory::createConversation(const TransportPacket& packet, const ConfiguredConversation* configured_conversation) {
-        return new TcpConversation(packet, configured_conversation);
+    TcpConversation* TcpConversationFactory::createConversation(const TransportPacket& packet, const TargetTestServer* test_server) {
+        return new TcpConversation(packet, test_server);
     }
 } // namespace packet_replay

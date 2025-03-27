@@ -37,6 +37,25 @@ namespace packet_replay {
                 }
             } Action;
 
+            /**
+             * The current action.
+             */
+            Action* actionFront() {
+                return action_queue_.front();
+            }
+
+            bool actionEmpty() {
+                return action_queue_.empty();
+            }
+
+            /**
+             * remove the current action
+             */
+            void actionPop() {
+                delete action_queue_.front();
+                action_queue_.pop();
+            }
+
             virtual int getAddressFamily() = 0;
 
             /**

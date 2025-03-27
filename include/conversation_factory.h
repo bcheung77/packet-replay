@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-#include "configured_conversation.h"
+#include "target_test_server.h"
 #include "tcp_conversation.h"
 #include "transport_packet.h"
 
@@ -20,12 +20,12 @@ namespace packet_replay {
             /**
              * create a test target server from a string specification
              */
-            virtual std::pair<std::string, ConfiguredConversation*> createConfiguredConversation(const char* spec) = 0;
+            virtual std::pair<std::string, TargetTestServer*> createTargetTestServer(const char* spec) = 0;
 
             /**
              * Return a list of value lookup keys for finding the target server
              */
-            virtual std::vector<std::string> getConfiguredConversationKeys(const TransportPacket& packet) = 0;
+            virtual std::vector<std::string> getTargetTestServerKeys(const TransportPacket& packet) = 0;
 
             /**
              * Return a key to find a conversation the specified packet belong to
@@ -35,15 +35,15 @@ namespace packet_replay {
             /**
              * Create a conversation based on a packet and configured test server
              */
-            virtual T* createConversation(const TransportPacket& packet, const ConfiguredConversation* configured_conversation) = 0;
+            virtual T* createConversation(const TransportPacket& packet, const TargetTestServer* configured_conversation) = 0;
     };
 
     class TcpConversationFactory : public ConversationFactory<TcpConversation> {
         public:
-            std::pair<std::string, ConfiguredConversation*> createConfiguredConversation(const char* spec);
-            std::vector<std::string> getConfiguredConversationKeys(const TransportPacket& packet);
+            std::pair<std::string, TargetTestServer*> createTargetTestServer(const char* spec);
+            std::vector<std::string> getTargetTestServerKeys(const TransportPacket& packet);
             std::string getKey(const TransportPacket& packet);
-            TcpConversation* createConversation(const TransportPacket& packet, const ConfiguredConversation* configured_conversation);
+            TcpConversation* createConversation(const TransportPacket& packet, const TargetTestServer* configured_conversation);
     };
 }
 

@@ -4,7 +4,7 @@
 #include <map>
 #include <string>
 
-#include "configured_conversation.h"
+#include "target_test_server.h"
 #include "conversation_factory.h"
 #include "packet_conversation.h"
 #include "transport_packet.h"
@@ -15,13 +15,13 @@ namespace packet_replay {
      */
     class ConversationStore {
         protected:
-            std::map<std::string, ConfiguredConversation*> configured_conversations_;
+            std::map<std::string, TargetTestServer*> test_servers_;
 
         public:
             ~ConversationStore() {
-                for (auto it = configured_conversations_.begin(); it != configured_conversations_.end();)  {
+                for (auto it = test_servers_.begin(); it != test_servers_.end();)  {
                     delete (*it).second;
-                    configured_conversations_.erase(it++);
+                    test_servers_.erase(it++);
                 }
             }
 
@@ -32,7 +32,7 @@ namespace packet_replay {
              */
             virtual PacketConversation* getConversation(TransportPacket& packet) = 0;
 
-            virtual void addConfiguredConversation(const char* spec) = 0;
+            virtual void addTargetTestServer(const char* spec) = 0;
 
     };
 
@@ -63,7 +63,7 @@ namespace packet_replay {
 
             PacketConversation* getConversation(TransportPacket& packet);
 
-            void addConfiguredConversation(const char* spec);
+            void addTargetTestServer(const char* spec);
     };
 
     template <class T> PacketConversation* TypedConversationStore<T>::getConversation(TransportPacket& packet) {
@@ -75,21 +75,21 @@ namespace packet_replay {
         if (conversations_.contains(conv_key)) {
             conversation = conversations_[conv_key];
         } else {
-            ConfiguredConversation* configured_conversation = nullptr;
+            TargetTestServer* test_server = nullptr;
 
-            std::vector<std::string> configured_keys = factory_.getConfiguredConversationKeys(packet);
+            std::vector<std::string> configured_keys = factory_.getTargetTestServerKeys(packet);
 
             for (auto key : configured_keys) {
-                if (configured_conversations_.contains(key)) {
+                if (test_servers_.contains(key)) {
                     is_configured = true;
-                    configured_conversation = configured_conversations_[key];
+                    test_server = test_servers_[key];
                     break;
                 }
             }
             
-            if (is_configured || (configured_conversations_.empty() && conversations_.empty())) {
+            if (is_configured || (test_servers_.empty() && conversations_.empty())) {
 
-                conversation = factory_.createConversation(packet, configured_conversation);
+                conversation = factory_.createConversation(packet, test_server);
 
                 conversations_[conv_key] = conversation;
             } 
@@ -109,10 +109,10 @@ namespace packet_replay {
     }
 
 
-    template <class T> void TypedConversationStore<T>::addConfiguredConversation(const char* spec) {
-        auto configured = factory_.createConfiguredConversation(spec);
+    template <class T> void TypedConversationStore<T>::addTargetTestServer(const char* spec) {
+        auto configured = factory_.createTargetTestServer(spec);
 
-        configured_conversations_[configured.first] = configured.second;
+        test_servers_[configured.first] = configured.second;
     }
 }
 
