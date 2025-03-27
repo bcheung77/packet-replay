@@ -12,7 +12,7 @@
 #include "capture.h"
 #include "http_replay.h"
 #include "http_response_processor.h"
-#include "tcp_conversation_store.h"
+#include "tcp_conversation.h"
 
 namespace packet_replay {
     void HttpReplayClient::replay() {
@@ -25,15 +25,13 @@ namespace packet_replay {
 
             switch (action->type_) {
                 case TcpConversation::CONNECT: {
-                    socket_ = socket(AF_INET, SOCK_STREAM, 0);
+                    socket_ = socket(conversation_->getAddressFamily(), SOCK_STREAM, 0);
                     if (socket_ < 0) {
                         throw std::runtime_error("socket failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
                     }
 
-                    auto [serv_addr, addr_size] = conversation_->getServerAddr();
-
                     // connect the client socket to server socket
-                    if (connect(socket_, (struct sockaddr *) serv_addr, addr_size) != 0) {
+                    if (connect(socket_, (struct sockaddr *) conversation_->getTestSockAddr(), conversation_->getSockAddrSize()) != 0) {
                         throw std::runtime_error("connect failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
                     }
 
@@ -106,7 +104,8 @@ static void printUsage(const char* name) {
 
 int main(int argc, char* argv[]) {
     try {
-        packet_replay::TcpConversationStore store;
+        packet_replay::TcpConversationFactory factory;
+        packet_replay::TypedConversationStore<packet_replay::TcpConversation> store(factory);
 
         int opt;
         while((opt = getopt(argc, argv, "c:")) != -1) {  
@@ -135,8 +134,8 @@ int main(int argc, char* argv[]) {
 
         capture.load(argv[optind]);
 
-        for (auto conv : store.getConversationMap()) {
-            packet_replay::HttpReplayClient client(conv.second);
+        for (auto conv : store.getConversations()) {
+            packet_replay::HttpReplayClient client(conv);
 
             client.replay();
         }

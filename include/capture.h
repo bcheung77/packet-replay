@@ -1,23 +1,11 @@
 #ifndef PACKET_REPLAY_CAPTURE_H
 #define PACKET_REPLAY_CAPTURE_H
 
+#include "conversation_store.h"
 #include "packet_conversation.h"
 #include "transport_packet.h"
 
 namespace packet_replay {
-    /**
-     * An interface to retrieve the conversation a packet belongs to.
-     */
-    class ConversationStore {
-        public:
-            /**
-             * Get the conversation a packet belongs to
-             * 
-             * @return the conversation associated with the packet or nullptr if none found
-             */
-            virtual PacketConversation* getConversation(TransportPacket& packet) = 0;
-    };
-
     /**
      * Class responsible for loading, parsing, and processing a PCAP capture file
      */

@@ -1,11 +1,15 @@
 #ifndef PACKET_REPLAY_NETWORK_LAYERS_H
 #define PACKET_REPLAY_NETWORK_LAYERS_H
 
+#include <string>
+
 #include <stdint.h>
 
+#include <arpa/inet.h>
 #include <net/ethernet.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h>
 
 namespace packet_replay {
     typedef enum {
@@ -97,6 +101,41 @@ namespace packet_replay {
             LayerNumber getLayerNumber() {
                 return NETWORK;
             }
+
+            virtual const void* getSrcAddr() const = 0;
+
+            virtual const void* getDestAddr() const = 0;
+
+            /**
+             * Get the source address as a string
+             */
+            virtual std::string getSrcAddrStr() const = 0;
+            
+            virtual int getAddrFamily() const = 0;
+
+            virtual int getAddrSize() const = 0;
+
+            /**
+             * Get the size of the socket address structure used for this layer
+             */
+            virtual int getSockAddrSize() const = 0;
+
+            /**
+             * Convert a string address to network address
+             * 
+             * @param addr_str the address in string format
+             * @param buf the buffer to put network address in.  Must have at least getAddrSize() bytes allocated.
+             */
+            virtual bool getAddrFromString(const std::string& addr_str, void* buf) const = 0;
+
+            /**
+             * Convert the given address and port into a socket address
+             * 
+             * @param addr 
+             * @param port
+             * @param addr_buf the buffer to put the socket address in.  Must have at least getSockAddrSize() bytes allocated.
+             */
+            virtual void getSockAddr(const uint8_t* addr, int port, uint8_t* addr_buf) = 0;
     };
 
     class IpLayer : public Layer3 {
@@ -128,16 +167,56 @@ namespace packet_replay {
                 return header_->ip_p;
             }
 
-            uint32_t getSrcIp() {
-                return header_->ip_src.s_addr;
+            const void* getSrcAddr() const {
+                return &header_->ip_src;
             }
 
-            uint32_t getDestIp() {
-                return header_->ip_dst.s_addr;
+            const void* getDestAddr() const {
+                return &header_->ip_dst;
+            }
+
+            std::string getSrcAddrStr() const {
+                char ip_str[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &header_->ip_src, ip_str, INET_ADDRSTRLEN);
+
+                return std::string(ip_str);
+            }
+
+            int getAddrFamily() const {
+                return AF_INET;
+            }
+
+            int getAddrSize() const {
+                return sizeof(header_->ip_src);
+            }
+
+            int getSockAddrSize() const {
+                return sizeof(struct sockaddr_in);
+            }
+
+            bool getAddrFromString(const std::string& addr_str, void* buf) const {
+                return inet_pton(AF_INET, addr_str.c_str(), buf);
+            }
+
+            void getSockAddr(const uint8_t* addr, int port, uint8_t* addr_buf) {
+                struct sockaddr_in* output_addr = reinterpret_cast<struct sockaddr_in*>(addr_buf);
+
+                output_addr->sin_family = getAddrFamily();
+                memcpy (&output_addr->sin_addr.s_addr, addr, getAddrSize());
+                output_addr->sin_port = port;
             }
     };
 
-    class TcpLayer : public Layer {
+    class Layer4 : public Layer {
+        public:
+            Layer4(const uint8_t* packet, int packet_size) : Layer(packet, packet_size) {
+            }
+
+            virtual uint16_t getSrcPort() = 0;
+            virtual uint16_t getDestPort() = 0;
+    };
+
+    class TcpLayer : public Layer4 {
         private:
             const struct tcphdr* header_;
 
@@ -146,7 +225,7 @@ namespace packet_replay {
             TcpLayer(const TcpLayer&) = delete;
             TcpLayer& operator=(const TcpLayer&) = delete;
 
-            TcpLayer(const uint8_t* packet, int packet_size) : Layer(packet, packet_size) {
+            TcpLayer(const uint8_t* packet, int packet_size) : Layer4(packet, packet_size) {
                 header_= reinterpret_cast<const struct tcphdr*>(packet);
             }
 
@@ -195,6 +274,35 @@ namespace packet_replay {
             }
     };
     
+    class UdpLayer : public Layer {
+        private:
+            const struct udphdr* header_;
+
+        public:
+            UdpLayer() = delete;
+            UdpLayer(const UdpLayer&) = delete;
+            UdpLayer& operator=(const UdpLayer&) = delete;
+
+            UdpLayer(const uint8_t* packet, int packet_size) : Layer(packet, packet_size) {
+                header_= reinterpret_cast<const struct udphdr*>(packet);
+            }
+
+            Protocol getProtocol() {
+                return PROTO_UDP;
+            }
+
+            LayerNumber getLayerNumber() {
+                return TRANSPORT;
+            }
+
+            const uint8_t* getData() {
+                return packet_ + sizeof(struct udphdr);
+            }
+
+            int getDataSize() {
+                return ntohs(header_->len) - sizeof(struct udphdr);
+            }
+    };
 }
 
 #endif

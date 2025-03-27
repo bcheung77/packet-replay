@@ -61,24 +61,30 @@ namespace packet_replay {
 
         packet.addLayer(ip_layer);
 
+        packet_replay::PacketConversation* conversation = nullptr;
         switch (ip_layer->getIpProtocol()) {
             case IPPROTO_TCP: {
                 TcpLayer* tcp_layer = new TcpLayer(ip_layer->getData(), ip_layer->getDataSize());
                 packet.addLayer(tcp_layer);
-
-                packet_replay::PacketConversation* conversation = conversation_store_.getConversation(packet);
-
-                if (conversation) {
-                    conversation->processCapturePacket(packet);
-                }
-    
                 break;
             }
     
-            case IPPROTO_UDP:
+            case IPPROTO_UDP: {
+                UdpLayer* udp_layer = new UdpLayer(ip_layer->getData(), ip_layer->getDataSize());
+                packet.addLayer(udp_layer);
+                break;
+            }
+
             default:
                 return;
         }
+
+        conversation = conversation_store_.getConversation(packet);
+
+        if (conversation) {
+            conversation->processCapturePacket(packet);
+        }
+
     }
 
     static void packet_handler_func(u_char *this_ptr, const struct pcap_pkthdr *h, const u_char *bytes) {

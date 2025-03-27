@@ -1,31 +1,14 @@
 
 #include <string.h>
 
-#include <algorithm>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
-#include"http_response_processor.h"
+#include "http_response_processor.h"
+#include "util.h"
 
 namespace packet_replay {
-    static void trimLeft(std::string &s) {
-        s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
-            return !std::isspace(ch);
-        }));
-    }
-    
-    static void trimRight(std::string &s) {
-        s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
-            return !std::isspace(ch);
-        }).base(), s.end());
-    }
-
-    static void trim(std::string &s) {
-        trimLeft(s);
-        trimRight(s);
-    }
-
     bool HttpResponseProcessor::processData(uint8_t* data, int data_size) {
         if (status_code_ == -1) {
             auto orig_len = header_str_.length();
@@ -73,6 +56,12 @@ namespace packet_replay {
             return ret;
         }
 
+        ret = payload_size_ - other.payload_size_;
+
+        if (ret != 0) {
+            return ret;
+        }
+
         ret = memcmp(payload_, other.payload_, payload_size_);
 
         return ret;
@@ -102,7 +91,7 @@ namespace packet_replay {
                 trim(key);
                 trim(value);
 
-                std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c){ return std::tolower(c); });
+                toLower(key);
 
                 headers_[key] = value;
             }

@@ -6,7 +6,39 @@
 #include "tcp_conversation.h"
 
 namespace packet_replay {
-    void IpV4TcpConversation::processCapturePacket(const TransportPacket& packet) {
+    TcpConversation::TcpConversation(const TransportPacket& packet, const ConfiguredConversation* configured_conversation) : 
+        capTcpState_(CLOSED), socket_(-1) {
+            Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
+            TcpLayer* tcpLayer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
+
+            addr_family_ = layer3->getAddrFamily();
+            addr_size_ = layer3->getAddrSize();
+            sock_addr_size_ = layer3->getSockAddrSize();
+
+            cap_src_addr_ = new uint8_t[addr_size_];
+            cap_dest_addr_ = new uint8_t[addr_size_];
+            test_dest_addr_ = new uint8_t[addr_size_];
+
+            memcpy(cap_src_addr_, layer3->getSrcAddr(), addr_size_);
+            memcpy(cap_dest_addr_, layer3->getDestAddr(), addr_size_);
+
+            cap_src_port_ = tcpLayer->getSrcPort();
+            cap_dest_port_ = tcpLayer->getDestPort();
+
+            if (configured_conversation) {
+                layer3->getAddrFromString(configured_conversation->test_addr_, test_dest_addr_);
+                test_dest_port_ = htons(configured_conversation->test_port_);
+            } else {
+                memcpy(test_dest_addr_, cap_dest_addr_, addr_size_);
+                test_dest_port_ = cap_dest_port_;
+            }
+
+            test_sock_addr_ = new uint8_t[sock_addr_size_];
+
+            layer3->getSockAddr(test_dest_addr_, test_dest_port_, test_sock_addr_);
+    }
+
+    void TcpConversation::processCapturePacket(const TransportPacket& packet) {
         TcpLayer* tcp_layer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
         // std::cout << "processing packet - data size " << tcp_layer->getDataSize() << std::endl;
@@ -41,11 +73,11 @@ namespace packet_replay {
         }
     }
 
-    void IpV4TcpConversation::closeProcessCapturePacket(const TransportPacket& packet) {
-        IpLayer* ip_layer = dynamic_cast<IpLayer *>(packet.getLayer(NETWORK));
+    void TcpConversation::closeProcessCapturePacket(const TransportPacket& packet) {
+        Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
         TcpLayer* tcp_layer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
-        if (ip_layer->getSrcIp() == cap_src_ip_ && tcp_layer->getFlags() == TH_SYN) {
+        if (memcmp(layer3->getSrcAddr(), cap_src_addr_, addr_size_) == 0 && tcp_layer->getFlags() == TH_SYN) {
             if (socket_ != -1) {
                 // connection already exists ... 
                 close(socket_);
@@ -60,22 +92,22 @@ namespace packet_replay {
         }
     }
 
-    void IpV4TcpConversation::synSentProcessCapturePacket(const TransportPacket& packet) {
-        IpLayer* ip_layer = dynamic_cast<IpLayer *>(packet.getLayer(NETWORK));
+    void TcpConversation::synSentProcessCapturePacket(const TransportPacket& packet) {
+        Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
         TcpLayer* tcp_layer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
-        if (ip_layer->getSrcIp() == cap_dest_ip_ && tcp_layer->hasAck() && tcp_layer->hasSyn()) {
+        if (memcmp(layer3->getSrcAddr(), cap_dest_addr_, addr_size_) == 0 && tcp_layer->hasAck() && tcp_layer->hasSyn()) {
             capTcpState_ = SYN_RECEIVED;
         } else {
             // unexpected packet
         }
     }
 
-    void IpV4TcpConversation::synRecvProcessCapturePacket(const TransportPacket& packet) {
-        IpLayer* ip_layer = dynamic_cast<IpLayer *>(packet.getLayer(NETWORK));
+    void TcpConversation::synRecvProcessCapturePacket(const TransportPacket& packet) {
+        Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
         TcpLayer* tcp_layer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
-        if (ip_layer->getSrcIp() == cap_src_ip_ && tcp_layer->hasAck()) {
+        if (memcmp(layer3->getSrcAddr(), cap_src_addr_, addr_size_) == 0 && tcp_layer->hasAck()) {
              capTcpState_ = ESTABLISHED;
 
              Action* connect_action = new Action(CONNECT);
@@ -86,14 +118,14 @@ namespace packet_replay {
         }
     }
 
-    void IpV4TcpConversation::estProcessCapturePacket(const TransportPacket& packet) {
-        IpLayer* ip_layer = dynamic_cast<IpLayer *>(packet.getLayer(NETWORK));
+    void TcpConversation::estProcessCapturePacket(const TransportPacket& packet) {
+        Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
         TcpLayer* tcp_layer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
         int data_size = tcp_layer->getDataSize();
         if (data_size) {
             Action* action;
-            if (ip_layer->getSrcIp() == cap_src_ip_ && tcp_layer->getSrcPort() == cap_src_port_) {
+            if (memcmp(layer3->getSrcAddr(), cap_src_addr_, addr_size_) == 0 && tcp_layer->getSrcPort() == cap_src_port_) {
                 action = new Action(SEND);
             } else {
                 action = new Action(RECV);
@@ -112,4 +144,5 @@ namespace packet_replay {
             action_queue_.push(new Action(CLOSE));
         }
     }
+
 }
