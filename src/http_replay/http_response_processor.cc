@@ -20,7 +20,7 @@ namespace packet_replay {
 
                 if (pos != std::string::npos) {
                     parseHeader(header_str_.substr(0, pos));
-                    if (auto it = headers_.find("content-length"); it != headers_.end()) {
+                    if (headers_.contains("content-length")) {
                         payload_size_ = std::stoul(headers_["content-length"]);
                         payload_ = new uint8_t[payload_size_];
     

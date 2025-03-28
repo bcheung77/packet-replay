@@ -9,12 +9,17 @@
 #include "target_test_server.h"
 #include "tcp_conversation.h"
 #include "transport_packet.h"
+#include "udp_conversation.h"
 
 namespace packet_replay {
+    std::pair<std::string, TargetTestServer*> tcpIpCreateTargetTestServer(const char* spec);
+    std::vector<std::string> tcpIpGetTargetTestServerKeys(const TransportPacket& packet);
+    std::string tcpIpGetKey(const TransportPacket& packet);
+
     /**
      * Class to create Conversation objects
      */
-    template <typename T>
+    template <class T>
     class ConversationFactory {
         public:
             /**
@@ -40,11 +45,42 @@ namespace packet_replay {
 
     class TcpConversationFactory : public ConversationFactory<TcpConversation> {
         public:
-            std::pair<std::string, TargetTestServer*> createTargetTestServer(const char* spec);
-            std::vector<std::string> getTargetTestServerKeys(const TransportPacket& packet);
-            std::string getKey(const TransportPacket& packet);
-            TcpConversation* createConversation(const TransportPacket& packet, const TargetTestServer* configured_conversation);
+            std::pair<std::string, TargetTestServer*> createTargetTestServer(const char* spec) {
+                return tcpIpCreateTargetTestServer(spec);
+            }
+
+            std::vector<std::string> getTargetTestServerKeys(const TransportPacket& packet) {
+                return tcpIpGetTargetTestServerKeys(packet);
+            }
+
+            std::string getKey(const TransportPacket& packet) {
+                return tcpIpGetKey(packet);
+            }
+
+            TcpConversation* createConversation(const TransportPacket& packet, const TargetTestServer* test_server) {
+                return new TcpConversation(packet, test_server);
+            }
     };
+
+    class UdpConversationFactory : public ConversationFactory<UdpConversation> {
+        public:
+        std::pair<std::string, TargetTestServer*> createTargetTestServer(const char* spec) {
+            return tcpIpCreateTargetTestServer(spec);
+        }
+
+        std::vector<std::string> getTargetTestServerKeys(const TransportPacket& packet) {
+            return tcpIpGetTargetTestServerKeys(packet);
+        }
+
+        std::string getKey(const TransportPacket& packet) {
+            return tcpIpGetKey(packet);
+        }
+
+        UdpConversation* createConversation(const TransportPacket& packet, const TargetTestServer* test_server) {
+            return new UdpConversation(packet, test_server);
+        }
+};
+
 }
 
 

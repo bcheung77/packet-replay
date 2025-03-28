@@ -18,8 +18,8 @@ namespace packet_replay {
     
         return addr1 + KEY_SEPARATOR + std::to_string(port1) + KEY_SEPARATOR + addr2 + KEY_SEPARATOR + std::to_string(port2);
     }
-    
-    std::pair<std::string, TargetTestServer*> TcpConversationFactory::createTargetTestServer(const char* spec) {
+
+    std::pair<std::string, TargetTestServer*> tcpIpCreateTargetTestServer(const char* spec) {
         std::string src_addr;
         int src_port = NO_PORT;
         bool has_test_addr = false;
@@ -72,26 +72,26 @@ namespace packet_replay {
         return {key, value};
     }
 
-    std::vector<std::string> TcpConversationFactory::getTargetTestServerKeys(const TransportPacket& packet) {
+    std::vector<std::string> tcpIpGetTargetTestServerKeys(const TransportPacket& packet) {
         Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
-        TcpLayer* tcpLayer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
+        Layer4* layer4 = dynamic_cast<Layer4 *>(packet.getLayer(TRANSPORT));
 
         std::vector<std::string> keys;
 
-        keys.push_back(layer3->getSrcAddrStr() + ":" + std::to_string(tcpLayer->getSrcPort()));
+        keys.push_back(layer3->getSrcAddrStr() + ":" + std::to_string(layer4->getSrcPort()));
         keys.push_back(layer3->getSrcAddrStr());
 
         return keys;
     }
 
-    std::string TcpConversationFactory::getKey(const TransportPacket& packet) {
+    std::string tcpIpGetKey(const TransportPacket& packet) {
         Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
-        TcpLayer* tcpLayer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
+        Layer4* layer4 = dynamic_cast<Layer4 *>(packet.getLayer(TRANSPORT));
 
         const void* src_addr = layer3->getSrcAddr();
         const void* dest_addr = layer3->getDestAddr();
-        uint16_t src_port = tcpLayer->getSrcPort();
-        uint16_t dest_port = tcpLayer->getDestPort();
+        uint16_t src_port = layer4->getSrcPort();
+        uint16_t dest_port = layer4->getDestPort();
     
         auto src_addr_str = bytes_to_hex_string(static_cast<const uint8_t *>(src_addr), layer3->getAddrSize());
         auto dest_addr_str = bytes_to_hex_string(static_cast<const uint8_t *>(dest_addr), layer3->getAddrSize());
@@ -109,9 +109,5 @@ namespace packet_replay {
         } else {
             return generateKey(dest_addr_str, dest_port, src_addr_str, src_port);
         }
-    }
-
-    TcpConversation* TcpConversationFactory::createConversation(const TransportPacket& packet, const TargetTestServer* test_server) {
-        return new TcpConversation(packet, test_server);
     }
 } // namespace packet_replay

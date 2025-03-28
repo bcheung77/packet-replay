@@ -68,7 +68,7 @@ namespace packet_replay {
 
     template <class T> PacketConversation* TypedConversationStore<T>::getConversation(TransportPacket& packet) {
 
-        packet_replay::TcpConversation* conversation = nullptr;
+        T* conversation = nullptr;
         bool is_configured = false;
 
         const std::string conv_key = factory_.getKey(packet);

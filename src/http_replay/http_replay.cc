@@ -24,7 +24,7 @@ namespace packet_replay {
             auto action = conversation_->actionFront();
 
             switch (action->type_) {
-                case TcpConversation::CONNECT: {
+                case PacketConversation::CONNECT: {
                     socket_ = socket(conversation_->getAddressFamily(), SOCK_STREAM, 0);
                     if (socket_ < 0) {
                         throw std::runtime_error("socket failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
@@ -38,7 +38,7 @@ namespace packet_replay {
                     break;
                 }
 
-                case TcpConversation::SEND: {
+                case PacketConversation::SEND: {
                     auto nwrite = 0;
                     
                     while (nwrite < action->data_size_) {
@@ -59,7 +59,7 @@ namespace packet_replay {
                     break;
                 }
 
-                case TcpConversation::RECV: {
+                case PacketConversation::RECV: {
                     if (!expected_processor.complete()) {
                         expected_processor.processData(action->data_, action->data_size_);
                     }
@@ -85,7 +85,7 @@ namespace packet_replay {
                     break;
                 }
 
-                case TcpConversation::CLOSE:
+                case PacketConversation::CLOSE:
                     close(socket_);
                     socket_ = -1;
                     break;

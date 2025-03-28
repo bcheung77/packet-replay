@@ -5,6 +5,8 @@
 
 #include <stdint.h>
 
+#include <string.h>
+
 #include <arpa/inet.h>
 #include <net/ethernet.h>
 #include <netinet/ip.h>
@@ -274,7 +276,7 @@ namespace packet_replay {
             }
     };
     
-    class UdpLayer : public Layer {
+    class UdpLayer : public Layer4 {
         private:
             const struct udphdr* header_;
 
@@ -283,7 +285,7 @@ namespace packet_replay {
             UdpLayer(const UdpLayer&) = delete;
             UdpLayer& operator=(const UdpLayer&) = delete;
 
-            UdpLayer(const uint8_t* packet, int packet_size) : Layer(packet, packet_size) {
+            UdpLayer(const uint8_t* packet, int packet_size) : Layer4(packet, packet_size) {
                 header_= reinterpret_cast<const struct udphdr*>(packet);
             }
 
@@ -301,6 +303,14 @@ namespace packet_replay {
 
             int getDataSize() {
                 return ntohs(header_->len) - sizeof(struct udphdr);
+            }
+
+            uint16_t getSrcPort() {
+                return header_->source;
+            }
+
+            uint16_t getDestPort() {
+                return header_->dest;
             }
     };
 }
