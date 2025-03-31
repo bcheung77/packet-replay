@@ -33,5 +33,7 @@
 
 build
 *.pcapng
+*.cap
 *.code-workspace
+__pycache__
 

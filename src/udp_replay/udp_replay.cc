@@ -7,13 +7,15 @@
 
 #include <exception>
 #include <iostream>
-#include <map>
+#include <vector>
 
 #include "udp_replay.h"
 #include "udp_conversation.h"
+#include "python_api.h"
+#include "util.h"
 
 namespace packet_replay {
-    UdpReplayClient::UdpReplayClient(UdpConversation* conversation) : conversation_(conversation) {
+    UdpReplayClient::UdpReplayClient(UdpConversation* conversation, PacketValidator* validator) : conversation_(conversation), validator_(validator) {
         socket_ = socket(conversation->getAddressFamily(), SOCK_DGRAM, 0);
         if (socket_ < 0) {
             throw std::runtime_error("socket failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
@@ -35,9 +37,10 @@ namespace packet_replay {
                 }
 
                 case PacketConversation::RECV: {
-                    uint8_t* data = new uint8_t[action->data_size_];
+                    // TODO: set configurable buffer size
+                    uint8_t* data = new uint8_t[action->data_size_ + 1024];
 
-                    // TODO: verify message is really froms server
+                    // TODO: verify message is really from server
                     auto nread = recvfrom(socket_, data, action->data_size_, 0, nullptr, nullptr);
 
                     if (nread < 0) {
@@ -45,7 +48,7 @@ namespace packet_replay {
                         throw std::runtime_error("recvfrom failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
                     }
 
-                    if (nread != action->data_size_ || memcmp(data, action->data_, action->data_size_) != 0) {
+                    if (!validator_->validate(action->data_, action->data_size_, data, nread)) {
                         std::cout << "detected difference in server response" << std::endl;
                     }
 
@@ -62,22 +65,47 @@ namespace packet_replay {
 }
 
 static void printUsage(const char* name) {
-    std::cerr << "Usage: " << name << "[-c <client spec>] <cap file>" << std::endl;
+    std::cerr << "Usage: " << name << "[-c <client spec>] [-k <packet validator spec>] <cap file>" << std::endl;
+}
+
+static packet_replay::PacketValidator* parseValidator(const char * spec) {
+    std::vector<std::string> tokens = packet_replay::tokenize(spec, ':');
+
+    std::string err = "invalid validator spec '";
+    err.append(spec).append("'");
+
+    if (tokens.size() != 3) {
+        throw std::invalid_argument(err);
+    }
+
+    std::string type_token = tokens[0];
+    packet_replay::toLower(type_token);
+
+    if (type_token != "python") {
+        throw std::invalid_argument(err);
+    }
+
+    return new packet_replay::PythonPacketValidator(tokens[1], tokens[2]);
 }
 
 int main(int argc, char* argv[]) {
-
     try {
         packet_replay::UdpConversationFactory factory;
         packet_replay::TypedConversationStore<packet_replay::UdpConversation> store(factory);
 
+        packet_replay::PacketValidator* validator = new packet_replay::PacketValidator();
+
         int opt;
-        while((opt = getopt(argc, argv, "c:")) != -1) {  
+        while((opt = getopt(argc, argv, "c:k:")) != -1) {  
             switch(opt)  
             {  
                 case 'c':  
                     store.addTargetTestServer(optarg);
                     break;  
+
+                case 'k':
+                    validator = parseValidator(optarg);
+                    break;
 
                 default:
                     printUsage(argv[0]);
@@ -99,7 +127,7 @@ int main(int argc, char* argv[]) {
         capture.load(argv[optind]);
 
         for (auto conv : store.getConversations()) {
-            packet_replay::UdpReplayClient client(conv);
+            packet_replay::UdpReplayClient client(conv, validator);
 
             client.replay();
         }
