@@ -18,6 +18,7 @@ There are two primary use cases for creating this tool:
 ## Requirements
 
 - libpcap-dev
+- python development library
 
 ## Build
 
@@ -32,7 +33,7 @@ Mimics an HTTP client.
 
 Usage: http_replay [-c <client spec>] <cap file>
 
-client spec - \<src IP\>[:\<src port\>[:\<test IP\>[:\<test port\>]]]
+-c specifes the client to emulate.  Format: \<src IP\>[:\<src port\>[:\<test IP\>[:\<test port\>]]]
 
 - src IP - the IP address of the client in the capture file to recreate
 - src port - the port of the client in the capture file to recreate
@@ -41,11 +42,28 @@ client spec - \<src IP\>[:\<src port\>[:\<test IP\>[:\<test port\>]]]
 
 If no "client spec" is specified, the TCP stream with the first connection request is recreated.
 
+## udp_replay
+
+Replay captured UDP packets
+
+Usage: ./udp_replay[-c <client spec>] [-k <packet validator spec>] <cap file>
+
+-c specifes the client to emulate.  Format: \<src IP\>[:\<src port\>[:\<test IP\>[:\<test port\>]]]
+
+- src IP - the IP address of the client in the capture file to recreate
+- src port - the port of the client in the capture file to recreate
+- test IP - the IP of the target server to send the recreated requests to.  Defaults to the IP in the capture file
+- test port - the port of the target server to send the recreated request to.  Defaults to the port in the capture file
+
+-k specifies how to validate packets.  Default is exact packet match.  Format: \<type\>:\<type specific spec>
+
+- type - the type of validator.  Currently supports only "python"
+- <python spec> - format \<path to python module\>:<\<function name\>.  Example: [python:../src/python/dns.cap](/src/python/dns.py)  The function must return bool and take 2 "bytes" arguments expected-packet and test-packet
+
 ## Work in Progress
 
 This tool is still under active development. Current planned features include:
 
-- UDP support
 - IPv6 support
 - REST-specific enhancements, such as checking for JSON equivalency
 - TLS support
