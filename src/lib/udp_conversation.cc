@@ -15,18 +15,17 @@ namespace packet_replay
         }
 
         Action* action;
-        if (memcmp(cap_src_addr_, layer3->getSrcAddr(), addr_size_) == 0 && cap_src_port_ == udp_layer->getSrcPort()) {
-            action = new Action(SEND);
+        if (memcmp(cap_src_addr_.get(), layer3->getSrcAddr(), addr_size_) == 0 && cap_src_port_ == udp_layer->getSrcPort()) {
+            action = new Action(ActionType::SEND);
         } else {
-            action = new Action(RECV);
+            action = new Action(ActionType::RECV);
         }
 
-        auto data_size = udp_layer->getDataSize();
-        action->data_ = new uint8_t[data_size];
-        memcpy(action->data_, udp_layer->getData(), data_size);
-        action->data_size_ = data_size;
 
-        action_queue_.push(action);
+        auto udp_data = reinterpret_cast<const char *>(udp_layer->getData());
+
+        action->data_.insert(action->data_.cend(), udp_data, udp_data + udp_layer->getDataSize());
+        action_queue_.push_back(action);
     }    
 } // namespace packet_reply
 

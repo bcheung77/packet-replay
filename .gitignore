@@ -36,4 +36,5 @@ build
 *.cap
 *.code-workspace
 __pycache__
+.vscode
 

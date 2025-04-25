@@ -27,8 +27,8 @@ namespace packet_replay {
             auto action = conversation_->actionFront();
 
             switch (action->type_) {
-                case PacketConversation::SEND: {
-                    auto nwrite = sendto(socket_, action->data_, action->data_size_, 0, (const sockaddr*) conversation_->getTestSockAddr(), conversation_->getSockAddrSize());
+                case PacketConversation::ActionType::SEND: {
+                    auto nwrite = sendto(socket_, action->data_.data(), action->data_.size(), 0, (const sockaddr*) conversation_->getTestSockAddr(), conversation_->getSockAddrSize());
 
                     if (nwrite < 0) {
                         throw std::runtime_error("sendto failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
@@ -36,19 +36,21 @@ namespace packet_replay {
                     break;
                 }
 
-                case PacketConversation::RECV: {
+                case PacketConversation::ActionType::RECV: {
                     // TODO: set configurable buffer size
-                    uint8_t* data = new uint8_t[action->data_size_ + 1024];
+                    auto data_size = action->data_.size() + 1024;
+
+                    uint8_t* data = new uint8_t[data_size];
 
                     // TODO: verify message is really from server
-                    auto nread = recvfrom(socket_, data, action->data_size_, 0, nullptr, nullptr);
+                    auto nread = recvfrom(socket_, data, data_size, 0, nullptr, nullptr);
 
                     if (nread < 0) {
                         delete[] data;
                         throw std::runtime_error("recvfrom failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
                     }
 
-                    if (!validator_->validate(action->data_, action->data_size_, data, nread)) {
+                    if (!validator_->validate(reinterpret_cast<uint8_t *>(action->data_.data()), action->data_.size(), data, nread)) {
                         std::cout << "detected difference in server response" << std::endl;
                     }
 

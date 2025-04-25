@@ -9,15 +9,15 @@
 namespace packet_replay {
     std::vector<std::string> tokenize(const std::string& str, char delimiter);
 
-    std::string bytes_to_hex_string(const uint8_t *data, int size);
+    std::string bytes_to_hex_string(const uint8_t* data, int size);
 
-    void trimLeft(std::string &s);
+    std::string& trimLeft(std::string& s);
     
-    void trimRight(std::string &s);
+    std::string& trimRight(std::string& s);
 
-    void trim(std::string &s);
+    std::string& trim(std::string& s);
 
-    void toLower(std::string &s);
+    std::string& toLower(std::string& s);
 }
 
 #endif

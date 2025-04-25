@@ -40,7 +40,7 @@ namespace packet_replay
              */
             PythonPacketValidator(const std::string& python_file, const std::string& python_func);
             ~PythonPacketValidator();
-            bool validate(uint8_t* expected, int expected_len, uint8_t* actual, int actual_len);
+            bool validate(uint8_t* expected, int expected_len, uint8_t* actual, int actual_len) override;
 
         private:
             ValidatePythonCall* call_;

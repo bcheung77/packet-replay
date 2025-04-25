@@ -15,15 +15,23 @@ namespace packet_replay {
      */
     class TcpConversation : public PacketConversation {
         public:
-            TcpConversation& operator=(const TcpConversation&) = delete;
+            static constexpr char PROT_NAME[] = "TCP";
 
-            TcpConversation() = delete;
+            TcpConversation& operator=(const TcpConversation&) = delete;
 
             TcpConversation(const TransportPacket& packet, const TargetTestServer* target_test_server) : 
                 PacketConversation(packet, target_test_server), cap_tcp_state_(CLOSED), socket_(-1) {
             }
 
-            void processCapturePacket(const TransportPacket& packet);
+            TcpConversation(const Layer3& networkLayer, const TargetTestServer& target_test_server) : 
+                PacketConversation(networkLayer, target_test_server), cap_tcp_state_(CLOSED), socket_(-1) {
+            }
+
+            void processCapturePacket(const TransportPacket& packet) override;
+
+            const char* getProtocol() const override {
+                return PROT_NAME;
+            }
 
         protected:
             typedef enum TcpStateEnum {

@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 #include <stdint.h>
 
 namespace packet_replay {
@@ -32,7 +33,8 @@ namespace packet_replay {
             /**
              * Consume the response data.
              */
-            bool processData(uint8_t* data, int data_size);
+            bool processData(const std::vector<char>& data);
+            bool processData(const uint8_t* data, int data_len);
 
             /**
              * Reset this class to consume a new HTTP response

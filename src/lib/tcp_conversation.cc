@@ -50,7 +50,7 @@ namespace packet_replay {
         Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
         TcpLayer* tcp_layer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
-        if (memcmp(layer3->getSrcAddr(), cap_src_addr_, addr_size_) == 0 && tcp_layer->getFlags() == TH_SYN) {
+        if (memcmp(layer3->getSrcAddr(), cap_src_addr_.get(), addr_size_) == 0 && tcp_layer->getFlags() == TH_SYN) {
             if (socket_ != -1) {
                 // connection already exists ... 
                 close(socket_);
@@ -69,7 +69,7 @@ namespace packet_replay {
         Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
         TcpLayer* tcp_layer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
-        if (memcmp(layer3->getSrcAddr(), cap_dest_addr_, addr_size_) == 0 && tcp_layer->hasAck() && tcp_layer->hasSyn()) {
+        if (memcmp(layer3->getSrcAddr(), cap_dest_addr_.get(), addr_size_) == 0 && tcp_layer->hasAck() && tcp_layer->hasSyn()) {
             cap_tcp_state_ = SYN_RECEIVED;
         } else {
             // unexpected packet
@@ -80,12 +80,12 @@ namespace packet_replay {
         Layer3* layer3 = dynamic_cast<Layer3 *>(packet.getLayer(NETWORK));
         TcpLayer* tcp_layer = dynamic_cast<TcpLayer *>(packet.getLayer(TRANSPORT));
 
-        if (memcmp(layer3->getSrcAddr(), cap_src_addr_, addr_size_) == 0 && tcp_layer->hasAck()) {
+        if (memcmp(layer3->getSrcAddr(), cap_src_addr_.get(), addr_size_) == 0 && tcp_layer->hasAck()) {
             cap_tcp_state_ = ESTABLISHED;
 
-             Action* connect_action = new Action(CONNECT);
+             Action* connect_action = new Action(ActionType::CONNECT);
     
-             action_queue_.push(connect_action);
+             action_queue_.push_back(connect_action);
         } else {
             // unexpected packet
         }
@@ -98,23 +98,22 @@ namespace packet_replay {
         int data_size = tcp_layer->getDataSize();
         if (data_size) {
             Action* action;
-            if (memcmp(layer3->getSrcAddr(), cap_src_addr_, addr_size_) == 0 && tcp_layer->getSrcPort() == cap_src_port_) {
-                action = new Action(SEND);
+            if (memcmp(layer3->getSrcAddr(), cap_src_addr_.get(), addr_size_) == 0 && tcp_layer->getSrcPort() == cap_src_port_) {
+                action = new Action(ActionType::SEND);
             } else {
-                action = new Action(RECV);
+                action = new Action(ActionType::RECV);
             }
 
-            action->data_ = new uint8_t[data_size];
-            memcpy(action->data_, tcp_layer->getData(), data_size);
-            action->data_size_ = data_size;
+            auto tcp_data = reinterpret_cast<const char *>(tcp_layer->getData());
+            action->data_.insert(action->data_.cend(), tcp_data, tcp_data + data_size);
 
-            action_queue_.push(action);
+            action_queue_.push_back(action);
         }
 
         if (tcp_layer->hasFin()) {
             cap_tcp_state_ = CLOSED;
 
-            action_queue_.push(new Action(CLOSE));
+            action_queue_.push_back(new Action(ActionType::CLOSE));
         }
     }
 

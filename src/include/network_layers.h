@@ -1,6 +1,7 @@
 #ifndef PACKET_REPLAY_NETWORK_LAYERS_H
 #define PACKET_REPLAY_NETWORK_LAYERS_H
 
+#include <stdexcept>
 #include <string>
 
 #include <stdint.h>
@@ -71,15 +72,15 @@ namespace packet_replay {
                 header_ = reinterpret_cast<const struct ether_header*>(packet);
             }
 
-            Protocol getProtocol() {
+            Protocol getProtocol() override {
                 return PROTO_ETHERNET;
             }
 
-            LayerNumber getLayerNumber() {
+            LayerNumber getLayerNumber() override {
                 return DATA_LINK;
             }
 
-            const uint8_t* getData() {
+            const uint8_t* getData() override {
                 return packet_ + sizeof(struct ether_header);
             }
 
@@ -87,7 +88,7 @@ namespace packet_replay {
                 return ntohs(header_->ether_type);
             }
 
-            int getDataSize() {
+            int getDataSize() override {
                 return packet_size_ -  sizeof(struct ether_header);
             }
     };
@@ -100,18 +101,24 @@ namespace packet_replay {
             Layer3(const uint8_t* packet, int packet_size) : Layer(packet, packet_size) {
             }
 
-            LayerNumber getLayerNumber() {
+            LayerNumber getLayerNumber() override {
                 return NETWORK;
             }
 
-            virtual const void* getSrcAddr() const = 0;
+            virtual const void* getSrcAddr() const {
+                throw std::runtime_error("unsupported operation");
+            }
 
-            virtual const void* getDestAddr() const = 0;
+            virtual const void* getDestAddr() const {
+                throw std::runtime_error("unsupported operation");
+            }
 
             /**
              * Get the source address as a string
              */
-            virtual std::string getSrcAddrStr() const = 0;
+            virtual std::string getSrcAddrStr() const {
+                throw std::runtime_error("unsupported operation");
+            }
             
             virtual int getAddrFamily() const = 0;
 
@@ -137,10 +144,55 @@ namespace packet_replay {
              * @param port
              * @param addr_buf the buffer to put the socket address in.  Must have at least getSockAddrSize() bytes allocated.
              */
-            virtual void getSockAddr(const uint8_t* addr, int port, uint8_t* addr_buf) = 0;
+            virtual void getSockAddr(const uint8_t* addr, int port, uint8_t* addr_buf) const = 0;
     };
 
-    class IpLayer : public Layer3 {
+    class IpLayerSpec : public Layer3 {
+        public: 
+            IpLayerSpec(const uint8_t* packet, int packet_size) : Layer3(packet, packet_size) {
+            }
+
+            IpLayerSpec() : Layer3(nullptr, 0) {
+            }
+
+            const uint8_t* getData() override {
+                throw std::runtime_error("unsupported operation");
+            }
+
+            int getDataSize() override {
+                throw std::runtime_error("unsupported operation");
+            }
+
+            Protocol getProtocol() override {
+                return PROTO_IP;
+            }
+
+            int getAddrFamily() const override {
+                return AF_INET;
+            }
+
+            int getAddrSize() const override {
+                return sizeof(reinterpret_cast<const struct ip*>(0)->ip_src);
+            }
+
+            int getSockAddrSize() const override {
+                return sizeof(struct sockaddr_in);
+            }
+
+            bool getAddrFromString(const std::string& addr_str, void* buf) const override {
+                return inet_pton(AF_INET, addr_str.c_str(), buf);
+            }
+
+            void getSockAddr(const uint8_t* addr, int port, uint8_t* addr_buf) const override {
+                struct sockaddr_in* output_addr = reinterpret_cast<struct sockaddr_in*>(addr_buf);
+
+                output_addr->sin_family = getAddrFamily();
+                memcpy (&output_addr->sin_addr.s_addr, addr, getAddrSize());
+                output_addr->sin_port = port;
+            }
+    };
+
+    class IpLayer : public IpLayerSpec {
         private:
             const struct ip* header_;
 
@@ -149,19 +201,15 @@ namespace packet_replay {
             IpLayer(const IpLayer&) = delete;
             IpLayer& operator=(const IpLayer&) = delete;
 
-            IpLayer(const uint8_t* packet, int packet_size) : Layer3(packet, packet_size) {
+            IpLayer(const uint8_t* packet, int packet_size) : IpLayerSpec(packet, packet_size) {
                 header_= reinterpret_cast<const struct ip*>(packet_);
             }
 
-            Protocol getProtocol() {
-                return PROTO_IP;
-            }
-
-            const uint8_t* getData() {
+            const uint8_t* getData() override {
                 return packet_ + (header_->ip_hl * 4);
             }
 
-            int getDataSize() {
+            int getDataSize() override {
                 return ntohs(header_->ip_len) -  (header_->ip_hl * 4);
             }
 
@@ -169,43 +217,19 @@ namespace packet_replay {
                 return header_->ip_p;
             }
 
-            const void* getSrcAddr() const {
+            const void* getSrcAddr() const override {
                 return &header_->ip_src;
             }
 
-            const void* getDestAddr() const {
+            const void* getDestAddr() const override {
                 return &header_->ip_dst;
             }
 
-            std::string getSrcAddrStr() const {
+            std::string getSrcAddrStr() const override {
                 char ip_str[INET_ADDRSTRLEN];
                 inet_ntop(AF_INET, &header_->ip_src, ip_str, INET_ADDRSTRLEN);
 
                 return std::string(ip_str);
-            }
-
-            int getAddrFamily() const {
-                return AF_INET;
-            }
-
-            int getAddrSize() const {
-                return sizeof(header_->ip_src);
-            }
-
-            int getSockAddrSize() const {
-                return sizeof(struct sockaddr_in);
-            }
-
-            bool getAddrFromString(const std::string& addr_str, void* buf) const {
-                return inet_pton(AF_INET, addr_str.c_str(), buf);
-            }
-
-            void getSockAddr(const uint8_t* addr, int port, uint8_t* addr_buf) {
-                struct sockaddr_in* output_addr = reinterpret_cast<struct sockaddr_in*>(addr_buf);
-
-                output_addr->sin_family = getAddrFamily();
-                memcpy (&output_addr->sin_addr.s_addr, addr, getAddrSize());
-                output_addr->sin_port = port;
             }
     };
 
@@ -231,19 +255,19 @@ namespace packet_replay {
                 header_= reinterpret_cast<const struct tcphdr*>(packet);
             }
 
-            Protocol getProtocol() {
+            Protocol getProtocol() override {
                 return PROTO_TCP;
             }
 
-            LayerNumber getLayerNumber() {
+            LayerNumber getLayerNumber() override {
                 return TRANSPORT;
             }
 
-            const uint8_t* getData() {
+            const uint8_t* getData() override {
                 return packet_ + (header_->th_off * 4);
             }
 
-            int getDataSize() {
+            int getDataSize() override {
                 return packet_size_ - (header_->th_off * 4);
             }
 
@@ -267,11 +291,11 @@ namespace packet_replay {
                 return header_->th_flags;
             }
 
-            uint16_t getSrcPort() {
+            uint16_t getSrcPort() override {
                 return header_->source;
             }
 
-            uint16_t getDestPort() {
+            uint16_t getDestPort() override {
                 return header_->dest;
             }
     };
@@ -289,27 +313,27 @@ namespace packet_replay {
                 header_= reinterpret_cast<const struct udphdr*>(packet);
             }
 
-            Protocol getProtocol() {
+            Protocol getProtocol() override {
                 return PROTO_UDP;
             }
 
-            LayerNumber getLayerNumber() {
+            LayerNumber getLayerNumber() override {
                 return TRANSPORT;
             }
 
-            const uint8_t* getData() {
+            const uint8_t* getData() override {
                 return packet_ + sizeof(struct udphdr);
             }
 
-            int getDataSize() {
+            int getDataSize() override {
                 return ntohs(header_->len) - sizeof(struct udphdr);
             }
 
-            uint16_t getSrcPort() {
+            uint16_t getSrcPort() override {
                 return header_->source;
             }
 
-            uint16_t getDestPort() {
+            uint16_t getDestPort() override {
                 return header_->dest;
             }
     };

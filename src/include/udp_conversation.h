@@ -9,6 +9,8 @@ namespace packet_replay {
 
     class UdpConversation : public PacketConversation {
         public:
+            static constexpr char PROT_NAME[] = "UDP";
+
             UdpConversation& operator=(const UdpConversation&) = delete;
 
             UdpConversation() = delete;
@@ -16,7 +18,11 @@ namespace packet_replay {
             UdpConversation(const TransportPacket& packet, const TargetTestServer* target_test_server) : PacketConversation(packet, target_test_server) {
             }
             
-            void processCapturePacket(const TransportPacket& packet);
+            const char* getProtocol() const override {
+                return PROT_NAME;
+            }
+
+            void processCapturePacket(const TransportPacket& packet) override;
             
         protected:
             int socket_;

@@ -1,6 +1,5 @@
 import struct
 import io
-import socket
 
 # DNS packet validation function that avoids comparing the TTLs
 def validate(expected, actual):

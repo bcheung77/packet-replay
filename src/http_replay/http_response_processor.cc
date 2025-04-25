@@ -1,5 +1,5 @@
-
 #include <string.h>
+#include <stdint.h>
 
 #include <sstream>
 #include <stdexcept>
@@ -9,10 +9,14 @@
 #include "util.h"
 
 namespace packet_replay {
-    bool HttpResponseProcessor::processData(uint8_t* data, int data_size) {
+    bool HttpResponseProcessor::processData(const std::vector<char>& data) {
+        return processData(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+    }
+
+    bool HttpResponseProcessor::processData(const uint8_t* data, int data_size) {
         if (status_code_ == -1) {
             auto orig_len = header_str_.length();
-            header_str_.append(reinterpret_cast<char *>(data), data_size);
+            header_str_.append(reinterpret_cast<const char *>(data), data_size);
 
             if (orig_len + data_size > 3) {
                 int find_start = orig_len < 3 ? 0 : orig_len - 3;

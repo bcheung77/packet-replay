@@ -1,6 +1,7 @@
 #include "util.h"
 
 #include <algorithm>
+#include <cctype>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -31,24 +32,28 @@ namespace packet_replay {
         return ss.str();
     }
 
-    void trimLeft(std::string &s) {
+    std::string& trimLeft(std::string &s) {
         s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
             return !std::isspace(ch);
         }));
+        return s;
     }
     
-    void trimRight(std::string &s) {
+    std::string& trimRight(std::string &s) {
         s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
             return !std::isspace(ch);
         }).base(), s.end());
+        return s;
     }
 
-    void trim(std::string &s) {
+    std::string& trim(std::string &s) {
         trimLeft(s);
         trimRight(s);
+        return s;
     }
 
-    void toLower(std::string &s) {
+    std::string& toLower(std::string &s) {
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+        return s;
     }
 } // namespace packet_replay
