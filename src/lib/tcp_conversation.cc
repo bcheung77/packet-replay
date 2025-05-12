@@ -3,6 +3,7 @@
 
 #include <iostream>
 
+#include "action.h"
 #include "tcp_conversation.h"
 
 namespace packet_replay {
@@ -83,7 +84,7 @@ namespace packet_replay {
         if (memcmp(layer3->getSrcAddr(), cap_src_addr_.get(), addr_size_) == 0 && tcp_layer->hasAck()) {
             cap_tcp_state_ = ESTABLISHED;
 
-             Action* connect_action = new Action(ActionType::CONNECT);
+             Action* connect_action = new Action(Action::Type::CONNECT);
     
              action_queue_.push_back(connect_action);
         } else {
@@ -97,15 +98,14 @@ namespace packet_replay {
 
         int data_size = tcp_layer->getDataSize();
         if (data_size) {
+            auto tcp_data = reinterpret_cast<const char *>(tcp_layer->getData());
+
             Action* action;
             if (memcmp(layer3->getSrcAddr(), cap_src_addr_.get(), addr_size_) == 0 && tcp_layer->getSrcPort() == cap_src_port_) {
-                action = new Action(ActionType::SEND);
+                action = new Action(Action::Type::SEND, tcp_data, data_size);
             } else {
-                action = new Action(ActionType::RECV);
+                action = new Action(Action::Type::RECV, tcp_data, data_size);
             }
-
-            auto tcp_data = reinterpret_cast<const char *>(tcp_layer->getData());
-            action->data_.insert(action->data_.cend(), tcp_data, tcp_data + data_size);
 
             action_queue_.push_back(action);
         }
@@ -113,7 +113,7 @@ namespace packet_replay {
         if (tcp_layer->hasFin()) {
             cap_tcp_state_ = CLOSED;
 
-            action_queue_.push_back(new Action(ActionType::CLOSE));
+            action_queue_.push_back(new Action(Action::Type::CLOSE));
         }
     }
 

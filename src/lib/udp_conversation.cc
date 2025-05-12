@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "action.h"
 #include "transport_packet.h"
 #include "udp_conversation.h"
 
@@ -15,16 +16,14 @@ namespace packet_replay
         }
 
         Action* action;
-        if (memcmp(cap_src_addr_.get(), layer3->getSrcAddr(), addr_size_) == 0 && cap_src_port_ == udp_layer->getSrcPort()) {
-            action = new Action(ActionType::SEND);
-        } else {
-            action = new Action(ActionType::RECV);
-        }
-
-
         auto udp_data = reinterpret_cast<const char *>(udp_layer->getData());
 
-        action->data_.insert(action->data_.cend(), udp_data, udp_data + udp_layer->getDataSize());
+        if (memcmp(cap_src_addr_.get(), layer3->getSrcAddr(), addr_size_) == 0 && cap_src_port_ == udp_layer->getSrcPort()) {
+            action = new Action(Action::Type::SEND, udp_data, udp_layer->getDataSize());
+        } else {
+            action = new Action(Action::Type::RECV, udp_data, udp_layer->getDataSize());
+        }
+
         action_queue_.push_back(action);
     }    
 } // namespace packet_reply

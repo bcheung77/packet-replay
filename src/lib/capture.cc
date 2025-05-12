@@ -25,12 +25,12 @@ namespace packet_replay {
         // std::cout << packet_num++ << std::endl;
         
         TransportPacket packet;
-        IpLayer* ip_layer;
+        Layer3* network_layer;
 
         switch (datalink_type_) {
             case DLT_NULL:
                 if (bytes[0] == AF_INET || bytes[3] == AF_INET) {
-                    ip_layer = new IpLayer(bytes + 4, h->caplen - 4);
+                    network_layer = new IpLayer(bytes + 4, h->caplen - 4);
                 } else {
                     return;
                 }
@@ -40,10 +40,17 @@ namespace packet_replay {
                     EthernetLayer* eth_layer = new EthernetLayer(bytes, h->caplen);
                     packet.addLayer(eth_layer);
 
-                    if (eth_layer->getEtherType() == ETHERTYPE_IP) {
-                        ip_layer = new IpLayer(eth_layer->getData(), eth_layer->getDataSize());
-                    } else {
-                        return;
+                    switch (eth_layer->getEtherType()) {
+                        case ETHERTYPE_IP:
+                            network_layer = new IpLayer(eth_layer->getData(), eth_layer->getDataSize());
+                            break;
+
+                        case ETHERTYPE_IPV6:
+                            network_layer = new IpV6Layer(eth_layer->getData(), eth_layer->getDataSize());
+                            break; 
+                            
+                        default:
+                            return;
                     }
                 }
                 break;
@@ -59,18 +66,18 @@ namespace packet_replay {
     
         // std::cout << packet_num++ << " src: " << source_ip << " dest: " << dest_ip << std::endl;
 
-        packet.addLayer(ip_layer);
+        packet.addLayer(network_layer);
 
         packet_replay::PacketConversation* conversation = nullptr;
-        switch (ip_layer->getIpProtocol()) {
+        switch (network_layer->getNextProtocol()) {
             case IPPROTO_TCP: {
-                TcpLayer* tcp_layer = new TcpLayer(ip_layer->getData(), ip_layer->getDataSize());
+                TcpLayer* tcp_layer = new TcpLayer(network_layer->getData(), network_layer->getDataSize());
                 packet.addLayer(tcp_layer);
                 break;
             }
     
             case IPPROTO_UDP: {
-                UdpLayer* udp_layer = new UdpLayer(ip_layer->getData(), ip_layer->getDataSize());
+                UdpLayer* udp_layer = new UdpLayer(network_layer->getData(), network_layer->getDataSize());
                 packet.addLayer(udp_layer);
                 break;
             }

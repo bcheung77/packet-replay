@@ -19,7 +19,20 @@ namespace packet_replay {
         return addr1 + KEY_SEPARATOR + std::to_string(port1) + KEY_SEPARATOR + addr2 + KEY_SEPARATOR + std::to_string(port2);
     }
 
-    std::pair<std::string, TargetTestServer*> tcpIpCreateTargetTestServer(const char* spec) {
+    static std::string normalizeIpV6(const char* ipV6_addr) {
+        struct in6_addr addr;
+
+        if (!inet_pton(AF_INET6, ipV6_addr, &addr)) {
+            throw std::invalid_argument("invalid IPv6 address '" + std::string(ipV6_addr) + "'");
+        }
+
+        char addr_str[INET6_ADDRSTRLEN];
+        inet_ntop(AF_INET6, &addr, addr_str, INET6_ADDRSTRLEN);
+
+        return addr_str;
+    }
+
+    static std::pair<std::string, TargetTestServer*> parseIpV4Spec(const char* spec) {
         std::string src_addr;
         int src_port = NO_PORT;
         bool has_test_addr = false;
@@ -67,9 +80,80 @@ namespace packet_replay {
         }
 
         std::string key = src_port != NO_PORT ? src_addr + ":" + std::to_string(src_port) : src_addr;
-        TargetTestServer* value =  test_addr.empty() ? nullptr : new TargetTestServer(test_addr, test_port);
+        TargetTestServer* value =  test_addr.empty() ? nullptr : new TargetTestServer(test_addr, htons(test_port));
 
         return {key, value};
+    }
+
+    static std::pair<std::string, TargetTestServer*> parseIpV6Spec(const char* spec) {
+        std::string src_addr;
+        int src_port = NO_PORT;
+        bool has_test_addr = false;
+        std::string test_addr;
+        int test_port = NO_PORT;
+
+        auto tok_result = token(spec, ']');
+        if (tok_result.first != nullptr) {
+            src_addr = normalizeIpV6(tok_result.second.substr(1).c_str());
+        }
+
+        if (*(tok_result.first + 1) == ':') {
+            tok_result = token(tok_result.first + 2, ':');
+
+            if (!tok_result.second.empty()) {
+                try {
+                    src_port = htons(stoul(tok_result.second));
+                } catch (std::invalid_argument& e) {
+                    throw std::invalid_argument("invalid port number '" + tok_result.second + "'");
+                }
+            }
+        }
+
+        if (tok_result.first != nullptr) {
+            tok_result = token(tok_result.first + 1, ']');
+
+            if (!tok_result.second.empty()) {
+                if (tok_result.first == nullptr) {
+                    test_addr = normalizeIpV6(tok_result.second.c_str());
+                } else {
+                    if (tok_result.second.at(0) != '[') {
+                        throw std::invalid_argument("invalid spec '" + std::string(spec) + "'");
+                    }
+
+                    test_addr = normalizeIpV6(tok_result.second.substr(1).c_str());
+
+                    if (*(tok_result.first + 1) != ':') {
+                        throw std::invalid_argument("invalid spec '" + std::string(spec) + "'");
+                    }
+
+                    tok_result = token(tok_result.first + 2, ':');
+
+                    if (tok_result.first != nullptr) {
+                        throw std::invalid_argument("invalid spec '" + std::string(spec) + "'");                        
+                    } else if (!tok_result.second.empty()) {
+                        try {
+                            test_port = htons(stoul(tok_result.second));
+                        } catch (std::invalid_argument& e) {
+                            throw std::invalid_argument("invalid port number '" + tok_result.second + "'");
+                        }        
+                    }
+                }
+            }
+        }
+
+        std::string key = src_port != NO_PORT ? src_addr + ":" + std::to_string(src_port) : src_addr;
+        TargetTestServer* value =  test_addr.empty() ? nullptr : new TargetTestServer(test_addr, htons(test_port));
+
+        return {key, value};
+    }
+
+
+    std::pair<std::string, TargetTestServer*> tcpIpCreateTargetTestServer(const char* spec) {
+        if (spec[0] == '[') {
+            return parseIpV6Spec(spec);
+        }
+
+        return parseIpV4Spec(spec);
     }
 
     std::vector<std::string> tcpIpGetTargetTestServerKeys(const TransportPacket& packet) {

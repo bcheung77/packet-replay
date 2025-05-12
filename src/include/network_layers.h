@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <net/ethernet.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
@@ -119,6 +120,10 @@ namespace packet_replay {
             virtual std::string getSrcAddrStr() const {
                 throw std::runtime_error("unsupported operation");
             }
+
+            virtual int getNextProtocol() const {
+                throw std::runtime_error("unsupported operation");
+            }
             
             virtual int getAddrFamily() const = 0;
 
@@ -145,6 +150,92 @@ namespace packet_replay {
              * @param addr_buf the buffer to put the socket address in.  Must have at least getSockAddrSize() bytes allocated.
              */
             virtual void getSockAddr(const uint8_t* addr, int port, uint8_t* addr_buf) const = 0;
+    };
+
+    class IpV6LayerSpec : public Layer3 {
+        public: 
+            IpV6LayerSpec(const uint8_t* packet, int packet_size) : Layer3(packet, packet_size) {
+            }
+
+            IpV6LayerSpec() : Layer3(nullptr, 0) {
+            }
+
+            const uint8_t* getData() override {
+                throw std::runtime_error("unsupported operation");
+            }
+
+            int getDataSize() override {
+                throw std::runtime_error("unsupported operation");
+            }
+
+            Protocol getProtocol() override {
+                return PROTO_IPv6;
+            }
+
+            int getAddrFamily() const override {
+                return AF_INET6;
+            }
+
+            int getAddrSize() const override {
+                return sizeof(reinterpret_cast<const struct ip6_hdr*>(0)->ip6_src);
+            }
+
+            int getSockAddrSize() const override {
+                return sizeof(struct sockaddr_in6);
+            }
+
+            bool getAddrFromString(const std::string& addr_str, void* buf) const override {
+                return inet_pton(AF_INET6, addr_str.c_str(), buf);
+            }
+
+            void getSockAddr(const uint8_t* addr, int port, uint8_t* addr_buf) const override {
+                struct sockaddr_in6* output_addr = reinterpret_cast<struct sockaddr_in6*>(addr_buf);
+
+                output_addr->sin6_family = getAddrFamily();
+                memcpy (&output_addr->sin6_addr.s6_addr, addr, getAddrSize());
+                output_addr->sin6_port = port;
+            }
+    };
+
+    class IpV6Layer : public IpV6LayerSpec {
+        private:
+            const struct ip6_hdr* header_;
+
+        public:
+            IpV6Layer() = delete;
+            IpV6Layer(const IpV6Layer&) = delete;
+            IpV6Layer& operator=(const IpV6Layer&) = delete;
+
+            IpV6Layer(const uint8_t* packet, int packet_size) : IpV6LayerSpec(packet, packet_size) {
+                header_ = reinterpret_cast<const struct ip6_hdr*>(packet_);
+            }
+
+            const uint8_t* getData() override {
+                return packet_ + (sizeof(*header_));
+            }
+
+            int getDataSize() override {
+                return ntohs(header_->ip6_ctlun.ip6_un1.ip6_un1_plen);
+            }
+
+            int getNextProtocol() const override {
+                return header_->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+            }
+
+            const void* getSrcAddr() const override {
+                return &header_->ip6_src;
+            }
+
+            const void* getDestAddr() const override {
+                return &header_->ip6_dst;
+            }
+
+            std::string getSrcAddrStr() const override {
+                char ip_str[INET6_ADDRSTRLEN];
+                inet_ntop(AF_INET6, &header_->ip6_src, ip_str, INET6_ADDRSTRLEN);
+
+                return std::string(ip_str);
+            }
     };
 
     class IpLayerSpec : public Layer3 {
@@ -213,7 +304,7 @@ namespace packet_replay {
                 return ntohs(header_->ip_len) -  (header_->ip_hl * 4);
             }
 
-            int getIpProtocol() {
+            int getNextProtocol() const override {
                 return header_->ip_p;
             }
 

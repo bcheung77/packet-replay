@@ -18,6 +18,18 @@ namespace packet_replay {
     std::string& trim(std::string& s);
 
     std::string& toLower(std::string& s);
+
+    /**
+     * Get the token before demarcated by the delimiter character or the end of the string.  
+     * 
+     * @param s the source string
+     * @param delimiter the delimiter
+     * 
+     * @return a pair consisting of a pointer to the delimiter character detected or 'nullptr' 
+     * if not found and the extracted token.
+     * 
+     */
+    const std::pair<const char *, std::string> token(const char* s, char delimiter);
 }
 
 #endif

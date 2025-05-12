@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#include "action.h"
 #include "base64.h"
 #include "conversation_serializer.h"
 #include "packet_conversation.h"
@@ -56,37 +57,37 @@ namespace packet_replay {
         return false;
     }
 
-    static std::string action_type_to_string(PacketConversation::ActionType type) {
+    static std::string action_type_to_string(Action::Type type) {
         switch (type) {
-            case PacketConversation::ActionType::CONNECT:
+            case Action::Type::CONNECT:
                 return "CONNECT";
-            case PacketConversation::ActionType::SEND:
+            case Action::Type::SEND:
                 return "SEND";
-            case PacketConversation::ActionType::RECV:
+            case Action::Type::RECV:
                 return "RECV";
-            case PacketConversation::ActionType::CLOSE:
+            case Action::Type::CLOSE:
                 return "CLOSE";
             default:
                 throw std::runtime_error("invalid action type " + std::to_string(static_cast<int>(type)));
         }
     }
 
-    static PacketConversation::ActionType string_to_action_type(std::string& type) {
+    static Action::Type string_to_action_type(std::string& type) {
 
         if (type == ACTION_CONNECT) {
-            return PacketConversation::ActionType::CONNECT;  
+            return Action::Type::CONNECT;  
         }
 
         if (type == ACTION_SEND) {
-            return PacketConversation::ActionType::SEND;  
+            return Action::Type::SEND;  
         }
 
         if (type == ACTION_RECV) {
-            return PacketConversation::ActionType::RECV;  
+            return Action::Type::RECV;  
         }
 
         if (type == ACTION_CLOSE) {
-            return PacketConversation::ActionType::CLOSE;  
+            return Action::Type::CLOSE;  
         }
 
         throw std::runtime_error("invalid action type " + type);
@@ -100,18 +101,33 @@ namespace packet_replay {
         char ip_str[INET6_ADDRSTRLEN];
         std::string port_str;
 
-        if (conversation->getAddressFamily() == AF_INET) { 
-            struct sockaddr_in* saddr = reinterpret_cast<struct sockaddr_in*>(conversation->getTestSockAddr());
+        switch (conversation->getAddressFamily()) {
+            case AF_INET: {
+                struct sockaddr_in* saddr = reinterpret_cast<struct sockaddr_in*>(conversation->getTestSockAddr());
 
-            port_str = std::to_string(ntohs(saddr->sin_port));
+                port_str = std::to_string(ntohs(saddr->sin_port));
 
-            if (inet_ntop(AF_INET, &saddr->sin_addr, ip_str, INET_ADDRSTRLEN) == nullptr) {
-                throw std::runtime_error("Cannot translate address");
+                if (inet_ntop(AF_INET, &saddr->sin_addr, ip_str, INET_ADDRSTRLEN) == nullptr) {
+                    throw std::runtime_error("Cannot translate address");
+                }
+
+                break;
             }
 
-            props.put(TEST_ADDRESS_PROP, ip_str);
-        } else {
-            throw std::runtime_error("Unsupported address family");
+            case AF_INET6: {
+                struct sockaddr_in6* saddr = reinterpret_cast<struct sockaddr_in6 *>(conversation->getTestSockAddr());
+
+                port_str = std::to_string(ntohs(saddr->sin6_port));
+
+                if (inet_ntop(AF_INET6, &saddr->sin6_addr.s6_addr, ip_str, INET6_ADDRSTRLEN) == nullptr) {
+                    throw std::runtime_error("Cannot translate address");
+                }
+
+                break;
+            }
+
+            default:
+                throw std::runtime_error("Unsupported address family");        
         }
 
         props.put(TEST_PORT_PROP, port_str);
@@ -177,7 +193,7 @@ namespace packet_replay {
 
     void ConversationSerializer::read_actions(std::istream& input, PacketConversation& conversation) {
         std::string line;
-        PacketConversation::ActionType type;
+        Action::Type type;
         Properties prop;
         std::vector<char> data;
 
@@ -216,24 +232,24 @@ namespace packet_replay {
                     data.insert(data.cend(), decoded.c_str(), decoded.c_str() + decoded.length());
                 }
 
-                PacketConversation::Action* action = new PacketConversation::Action(type);
-                action->data_ = std::move(data);
+                Action* action = create_action(type, std::move(data));
 
                 conversation.actionPush(action);
             }
         }
     }
 
-    void ConversationSerializer::write_action(std::ostream& output, const PacketConversation::Action* action) {
+    void ConversationSerializer::write_action(std::ostream& output, const Action* action) {
         output << action_type_to_string(action->type_) << std::endl;
 
         Properties prop;
 
         auto is_binary = false;
-        auto data_size = action->data_.size();
+        auto data = action->data();
+        auto data_size = data.size();
 
         for (int i = data_size - 1; i >= 0 && i > data_size - 50; i--) {
-            if (!isprint(action->data_[i]) && !isspace(action->data_[i])) {
+            if (!isprint(data[i]) && !isspace(data[i])) {
                 is_binary = true;
                 break;
             }
@@ -244,13 +260,13 @@ namespace packet_replay {
             prop.write(output);
             output << data_start_tag_ << std::endl;
 
-            auto data_view = std::string_view(action->data_.data(), action->data_.size());
+            auto data_view = std::string_view(data.data(), data_size);
             auto encoded_str = base64::to_base64(data_view);
 
             output << encoded_str;
         } else {
             output << data_start_tag_ << std::endl;
-            output.write(action->data_.data(), action->data_.size());
+            output.write(data.data(), data_size);
         }
         output << data_end_tag_ << std::endl;
     }
@@ -316,4 +332,34 @@ namespace packet_replay {
 
         return ptr;
     }
+
+    Action* ConversationSerializer::create_action(Action::Type type, std::vector<char>&& data) {
+        Action* action = new Action(type, std::move(data));
+
+        std::string_view view(data.data(), data.size());
+
+        auto start_idx = 0;
+        auto prefix_len = subPrefix_.length();
+        auto suffix_len = subSuffix_.length();
+
+        while (start_idx != std::string_view::npos) {
+            start_idx = view.find(subPrefix_, start_idx);
+
+            if (start_idx != std::string_view::npos)  {
+                auto end_idx = view.find(subSuffix_, start_idx + prefix_len);
+
+                if (end_idx != std::string_view::npos) {
+                    action->addSubToken(view.substr(start_idx + prefix_len, end_idx), start_idx, end_idx + suffix_len);
+                    start_idx = end_idx + suffix_len;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        return action;
+    }
+
 } // packet-replay

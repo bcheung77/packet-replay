@@ -1,10 +1,13 @@
 #include "util.h"
 
+#include <string.h>
+
 #include <algorithm>
 #include <cctype>
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace packet_replay {
@@ -55,5 +58,16 @@ namespace packet_replay {
     std::string& toLower(std::string &s) {
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
         return s;
+    }
+
+    const std::pair<const char *, std::string> token(const char* s, char delimiter) {
+        const char* end = strchr(s, delimiter);
+
+        if (end == nullptr) {
+
+            return std::make_pair(nullptr, std::string(s));
+        }
+
+        return std::make_pair(end, std::string(s, end - s));
     }
 } // namespace packet_replay

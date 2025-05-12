@@ -9,6 +9,7 @@
 #include <iostream>
 #include <map>
 
+#include "action.h"
 #include "capture.h"
 #include "conversation_serializer.h"
 #include "http_replay.h"
@@ -25,7 +26,7 @@ namespace packet_replay {
             auto action = conversation_->actionFront();
 
             switch (action->type_) {
-                case PacketConversation::ActionType::CONNECT: {
+                case Action::Type::CONNECT: {
                     socket_ = socket(conversation_->getAddressFamily(), SOCK_STREAM, 0);
                     if (socket_ < 0) {
                         throw std::runtime_error("socket failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
@@ -39,12 +40,13 @@ namespace packet_replay {
                     break;
                 }
 
-                case PacketConversation::ActionType::SEND: {
+                case Action::Type::SEND: {
                     auto nwrite = 0;
-                    auto data_size = action->data_.size();
+                    auto data = action->data();
+                    auto data_size = data.size();
                     
                     while (nwrite < data_size) {
-                        if (auto n = write(socket_, action->data_.data() + nwrite, data_size - nwrite); n > 0) {
+                        if (auto n = write(socket_, data.data() + nwrite, data_size - nwrite); n > 0) {
                             nwrite += n;
                         } else if (n < 0) {
                             throw std::runtime_error("write failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
@@ -61,9 +63,9 @@ namespace packet_replay {
                     break;
                 }
 
-                case PacketConversation::ActionType::RECV: {
+                case Action::Type::RECV: {
                     if (!expected_processor.complete()) {
-                        expected_processor.processData(action->data_);
+                        expected_processor.processData(action->data());
                     }
 
                     uint8_t buffer[BUFSIZ];
@@ -87,7 +89,7 @@ namespace packet_replay {
                     break;
                 }
 
-                case PacketConversation::ActionType::CLOSE:
+                case Action::Type::CLOSE:
                     close(socket_);
                     socket_ = -1;
                     break;
@@ -131,15 +133,17 @@ int main(int argc, char* argv[]) {
         packet_replay::Capture capture(store);
 
         // store.addConfiguredConversation("127.0.0.1:63596");
-        // store.addConfiguredConversation("192.168.1.72:64501");
+        // store.addTargetTestServer("192.168.1.72:64501");
         // store.addConfiguredConversation("127.0.0.1");
+        // store.addTargetTestServer("[2001:569:7e46:700:1d87:a4a6:9ef8:5dd]:62051:[2606:4700:3030::6815:5001]:80");
+        // store.addTargetTestServer("2001:569:7e46:700:1d87:a4a6:9ef8:5dd:62058");
 
         capture.load(argv[optind]);
 
         for (auto conv : store.getConversations()) {
             packet_replay::HttpReplayClient client(conv);
 
-//           packet_replay::ConversationSerializer().write(std::cout, conv);
+//            packet_replay::ConversationSerializer().write(std::cout, conv);
             client.replay();
         }
     } catch (const std::exception& e) {

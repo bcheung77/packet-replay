@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "action.h"
 #include "target_test_server.h"
 #include "transport_packet.h"
 
@@ -14,26 +15,6 @@ namespace packet_replay {
      */
     class PacketConversation {
         public:
-            enum class ActionType {
-                CONNECT,
-                SEND,
-                RECV,
-                CLOSE
-            };
-
-            /**
-             * Describes an action that took place in the capture.
-             */
-            using Action = struct action {
-                ActionType type_;
-                std::vector<char> data_;
-
-                action(ActionType type) : type_(type) {
-                }
-
-                action() = default;
-            };
-
             PacketConversation(const Layer3& layer3, const TargetTestServer& target_test_server) {
                 addr_family_ = layer3.getAddrFamily();
                 addr_size_ = layer3.getAddrSize();

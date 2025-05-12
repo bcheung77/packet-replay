@@ -9,6 +9,7 @@
 #include <iostream>
 #include <vector>
 
+#include "action.h"
 #include "udp_replay.h"
 #include "udp_conversation.h"
 #include "python_api.h"
@@ -27,8 +28,9 @@ namespace packet_replay {
             auto action = conversation_->actionFront();
 
             switch (action->type_) {
-                case PacketConversation::ActionType::SEND: {
-                    auto nwrite = sendto(socket_, action->data_.data(), action->data_.size(), 0, (const sockaddr*) conversation_->getTestSockAddr(), conversation_->getSockAddrSize());
+                case Action::Type::SEND: {
+                    auto data = action->data();
+                    auto nwrite = sendto(socket_, data.data(), data.size(), 0, (const sockaddr*) conversation_->getTestSockAddr(), conversation_->getSockAddrSize());
 
                     if (nwrite < 0) {
                         throw std::runtime_error("sendto failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
@@ -36,9 +38,9 @@ namespace packet_replay {
                     break;
                 }
 
-                case PacketConversation::ActionType::RECV: {
+                case Action::Type::RECV: {
                     // TODO: set configurable buffer size
-                    auto data_size = action->data_.size() + 1024;
+                    auto data_size = action->data().size() + 1024;
 
                     uint8_t* data = new uint8_t[data_size];
 
@@ -50,7 +52,7 @@ namespace packet_replay {
                         throw std::runtime_error("recvfrom failed: " + std::string(strerror(errno)) + " (" + std::to_string(errno) + ")");
                     }
 
-                    if (!validator_->validate(reinterpret_cast<uint8_t *>(action->data_.data()), action->data_.size(), data, nread)) {
+                    if (!validator_->validate(reinterpret_cast<const uint8_t *>(action->data().data()), action->data().size(), data, nread)) {
                         std::cout << "detected difference in server response" << std::endl;
                     }
 
